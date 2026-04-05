@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: pro-gas-erp-backend
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: erp-backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false       # Set manually in the Render dashboard (never hardcode secrets)
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "False"
+      - key: CORS_ORIGINS
+        sync: false       # Set to your Vercel domain after first deploy
+    healthCheckPath: /api/health
