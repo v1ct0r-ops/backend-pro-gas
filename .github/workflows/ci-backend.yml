@@ -1,0 +1,24 @@
+name: Backend CI - Guardián de Python
+
+on:
+  pull_request:
+    branches: [ "main", "qa" ]
+
+jobs:
+  build-and-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias de FastAPI
+        run: pip install -r requirements.txt
+
+      - name: Revisar sintaxis estricta de Python
+        run: python -m compileall .
