@@ -31,3 +31,15 @@ ENV/
 
 # Render
 .render/
+
+# AI / Claude Code — internal tooling, not for version control
+CLAUDE.md
+.claude/
+
+# Test & verification scripts (dev only)
+test_*.py
+verify_*.py
+certify_*.py
+stress_test_*.py
+setting_check.py
+*_plan.md
