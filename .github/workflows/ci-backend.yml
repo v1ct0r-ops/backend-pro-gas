@@ -1,12 +1,16 @@
 name: Backend CI - Guardián de Python
 
 on:
+  push:
+    branches: [ "dev", "qa", "main" ]
   pull_request:
-    branches: [ "main", "qa" ]
+    branches: [ "qa", "main" ]
 
 jobs:
-  build-and-check:
+  verificar-codigo:
+    name: Verificar sintaxis y dependencias
     runs-on: ubuntu-latest
+
     steps:
       - name: Descargar el código
         uses: actions/checkout@v4
@@ -17,8 +21,23 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Instalar dependencias de FastAPI
+      - name: Instalar dependencias
         run: pip install -r requirements.txt
 
-      - name: Revisar sintaxis estricta de Python
+      - name: Verificar sintaxis de Python
         run: python -m compileall .
+
+      - name: Verificar que los módulos principales importan correctamente
+        run: |
+          python -c "from app.models.models import Base"
+          python -c "from app.core.config import settings"
+          python -c "from app.core.security import hash_password, verify_password"
+          python -c "from app.core.dependencies import get_current_user"
+
+      - name: Verificar que no hay archivos .env comprometidos
+        run: |
+          if git ls-files | grep -E "^\.env$"; then
+            echo "ERROR: archivo .env encontrado en el repositorio"
+            exit 1
+          fi
+          echo "OK: sin archivos .env en el repositorio"
