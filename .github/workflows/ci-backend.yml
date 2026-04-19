@@ -1,0 +1,46 @@
+name: Backend CI - Guardián de Python
+
+on:
+  push:
+    branches: [ "dev", "qa", "main" ]
+  pull_request:
+    branches: [ "qa", "main" ]
+
+jobs:
+  verificar-codigo:
+    name: Verificar sintaxis y dependencias
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Verificar sintaxis de Python
+        run: python -m compileall .
+
+      - name: Verificar que los módulos principales importan correctamente
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci:ci@localhost/ci"
+          SECRET_KEY: "clave-dummy-solo-para-ci-no-usar-en-produccion"
+        run: |
+          python -c "from app.models.models import Base"
+          python -c "from app.core.config import settings"
+          python -c "from app.core.security import hash_password, verify_password"
+          python -c "from app.core.dependencies import get_current_user"
+
+      - name: Verificar que no hay archivos .env comprometidos
+        run: |
+          if git ls-files | grep -E "^\.env$"; then
+            echo "ERROR: archivo .env encontrado en el repositorio"
+            exit 1
+          fi
+          echo "OK: sin archivos .env en el repositorio"

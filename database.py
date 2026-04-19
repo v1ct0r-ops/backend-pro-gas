@@ -3,13 +3,13 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.core.config import settings
 
 
-# Synchronous engine - appropriate for a standard FastAPI + psycopg2 setup.
-# For async (asyncpg driver), see the migration notes at the bottom of this file.
+# Motor síncrono con psycopg2. Suficiente para la escala actual del proyecto.
+# Pool ajustado para Neon.tech, que tiene límite de conexiones en el plan gratuito (~10 max).
 engine = create_engine(
     settings.DATABASE_URL,
-    pool_pre_ping=True,    # Verifies connection health before each use (needed for Neon.tech)
-    pool_recycle=300,      # Recycle connections every 5 minutes
-    pool_size=5,           # Neon.tech free tier has a connection limit (~10 max)
+    pool_pre_ping=True,    # verifica la conexión antes de usarla (necesario con Neon.tech)
+    pool_recycle=300,      # recicla conexiones cada 5 minutos
+    pool_size=5,
     max_overflow=10,
     connect_args={"connect_timeout": 10},
 )
@@ -22,22 +22,11 @@ SessionLocal = sessionmaker(
 
 
 class Base(DeclarativeBase):
-    """All SQLAlchemy models should inherit from this Base."""
     pass
 
 
 def get_db():
-    """
-    FastAPI dependency that provides a database session.
-
-    Usage in a route:
-        from sqlalchemy.orm import Session
-        from fastapi import Depends
-        from database import get_db
-
-        def my_route(db: Session = Depends(get_db)):
-            ...
-    """
+    """Dependencia de FastAPI que provee una sesión de DB por request."""
     db = SessionLocal()
     try:
         yield db
@@ -46,29 +35,25 @@ def get_db():
 
 
 def check_db_connection() -> bool:
-    """
-    Executes a trivial SELECT 1 query to verify database connectivity.
-    Returns True on success, raises an exception on failure.
-    """
+    """Ejecuta un SELECT 1 para verificar que la DB responde. Lanza excepción si falla."""
     with engine.connect() as connection:
         connection.execute(text("SELECT 1"))
     return True
 
 
 # ---------------------------------------------------------------------------
-# ASYNC MIGRATION NOTES (for future reference):
+# NOTAS PARA MIGRACIÓN A ASYNC (por si en algún momento se necesita):
 #
-# If you want to switch to async SQLAlchemy with Neon.tech:
-#   1. Replace psycopg2-binary with: asyncpg==0.29.0
-#   2. Change DATABASE_URL prefix: postgresql+psycopg2 -> postgresql+asyncpg
-#      Remove ?sslmode=require from the URL string; pass ssl via connect_args:
+#   1. Cambiar psycopg2-binary por asyncpg==0.29.0
+#   2. Prefijo DATABASE_URL: postgresql+psycopg2 → postgresql+asyncpg
+#      Quitar ?sslmode=require del string; pasarlo así:
 #        connect_args={"ssl": "require"}
-#   3. Use:
+#   3. Importar:
 #        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 #        from sqlalchemy.orm import async_sessionmaker
-#   4. Replace create_engine -> create_async_engine
-#   5. Replace sessionmaker -> async_sessionmaker
-#   6. All DB operations become async/await
+#   4. Reemplazar create_engine → create_async_engine
+#   5. Reemplazar sessionmaker → async_sessionmaker
+#   6. Todas las operaciones de DB pasan a ser async/await
 #
-# The synchronous approach is simpler and fully sufficient for this project's scale.
+# Por ahora el modo síncrono es más simple y suficiente.
 # ---------------------------------------------------------------------------
