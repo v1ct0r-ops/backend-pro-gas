@@ -28,6 +28,9 @@ jobs:
         run: python -m compileall .
 
       - name: Verificar que los módulos principales importan correctamente
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci:ci@localhost/ci"
+          SECRET_KEY: "clave-dummy-solo-para-ci-no-usar-en-produccion"
         run: |
           python -c "from app.models.models import Base"
           python -c "from app.core.config import settings"
