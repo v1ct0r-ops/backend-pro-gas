@@ -36,8 +36,12 @@ def ajustar_stock(
     if nuevo_vacios < 0:
         raise HTTPException(400, f"Stock insuficiente para formato {producto.formato}")
 
-    producto.stock_llenos = nuevo_llenos
-    producto.stock_vacios = nuevo_vacios
-    db.commit()
-    db.refresh(producto)
+    try:
+        producto.stock_llenos = nuevo_llenos
+        producto.stock_vacios = nuevo_vacios
+        db.commit()
+        db.refresh(producto)
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(400, f"Violación de integridad de stock: {str(e)}")
     return producto
