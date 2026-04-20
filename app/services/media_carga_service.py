@@ -20,6 +20,10 @@ def procesar_media_carga(
             if not producto:
                 raise HTTPException(404, f"Producto {linea_in.producto_id} no encontrado")
 
+            # Capa 3 de clamping: validación explícita a nivel de servicio
+            if linea_in.cantidad_llenos < 1:
+                raise HTTPException(400, f"cantidad_llenos debe ser >= 1 para formato {producto.formato}")
+
             subtotal = linea_in.cantidad_llenos * linea_in.precio_unitario_neto
             total_neto += subtotal
             kilos_totales += linea_in.cantidad_llenos * producto.peso_kg
@@ -64,6 +68,10 @@ def procesar_media_carga(
     except HTTPException:
         db.rollback()
         raise
+    except ValueError as e:
+        # Captura errores de @validates en el modelo (clamping capa 2)
+        db.rollback()
+        raise HTTPException(400, f"Violación de integridad de stock: {str(e)}")
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Error procesando media carga: {str(e)}")
