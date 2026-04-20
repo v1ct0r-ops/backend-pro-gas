@@ -26,7 +26,7 @@ def validar_y_descontar(
 
     producto.stock_llenos = nuevo_llenos
     producto.stock_vacios = nuevo_vacios
-    db.commit()
+    db.flush()
     db.refresh(producto)
     return producto
 
