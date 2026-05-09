@@ -43,3 +43,8 @@ certify_*.py
 stress_test_*.py
 setting_check.py
 *_plan.md
+
+# Generated / tooling — no pertenecen al historial de git
+openapi.json
+export_openapi.py
+check_neon_schema.py
