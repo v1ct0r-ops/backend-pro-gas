@@ -22,7 +22,7 @@ class Usuario(Base):
     bitacora_llamadas: Mapped[list["BitacoraLlamada"]] = relationship(back_populates="usuario")
     medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario")
     cierres_diarios: Mapped[list["CierreDiario"]] = relationship(back_populates="usuario")
-    tratados_comerciales: Mapped[list["TratadoComercial"]] = relationship(back_populates="admin")
+    ventas_revendedor: Mapped[list["VentaRevendedor"]] = relationship(back_populates="usuario")
 
 
 class ProductoMaestro(Base):
@@ -38,8 +38,6 @@ class ProductoMaestro(Base):
     precio_publico_base: Mapped[int] = mapped_column(nullable=False)
     stock_llenos: Mapped[int] = mapped_column(nullable=False, default=0)
     stock_vacios: Mapped[int] = mapped_column(nullable=False, default=0)
-
-    tratados_comerciales: Mapped[list["TratadoComercial"]] = relationship(back_populates="formato")
 
     @validates("stock_llenos")
     def validate_stock_llenos(self, key: str, value: int) -> int:
@@ -117,19 +115,40 @@ class CierreDiario(Base):
     usuario: Mapped["Usuario"] = relationship(back_populates="cierres_diarios")
 
 
-class TratadoComercial(Base):
-    __tablename__ = "tratados_comerciales"
-    __table_args__ = (
-        CheckConstraint("descuento_por_kilo >= 0", name="ck_descuento_non_negative"),
-    )
+class VentaRevendedor(Base):
+    __tablename__ = "ventas_revendedor"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     rut_cliente: Mapped[str] = mapped_column(nullable=False, index=True)
     nombre_cliente: Mapped[str] = mapped_column(nullable=False)
-    formato_id: Mapped[int] = mapped_column(ForeignKey("productos_maestro.id"), nullable=False)
-    descuento_por_kilo: Mapped[float] = mapped_column(nullable=False)
-    vigente: Mapped[bool] = mapped_column(nullable=False, default=True)
-    admin_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    fecha: Mapped[datetime] = mapped_column(nullable=False)
+    total_neto: Mapped[int] = mapped_column(nullable=False)
+    descuento_pesos_por_kilo: Mapped[int] = mapped_column(nullable=False, default=0)
+    monto_descuento_total: Mapped[int] = mapped_column(nullable=False, default=0)
+    total_final: Mapped[int] = mapped_column(nullable=False, default=0)
+    total_iva: Mapped[int] = mapped_column(nullable=False)
+    total_bruto: Mapped[int] = mapped_column(nullable=False)
+    kilos_totales: Mapped[float] = mapped_column(nullable=False)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
 
-    formato: Mapped["ProductoMaestro"] = relationship(back_populates="tratados_comerciales")
-    admin: Mapped["Usuario"] = relationship(back_populates="tratados_comerciales")
+    usuario: Mapped["Usuario"] = relationship(back_populates="ventas_revendedor")
+    lineas: Mapped[list["VentaRevendedorLinea"]] = relationship(back_populates="venta", cascade="all, delete-orphan")
+
+
+class VentaRevendedorLinea(Base):
+    __tablename__ = "ventas_revendedor_lineas"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    venta_id: Mapped[int] = mapped_column(ForeignKey("ventas_revendedor.id"), nullable=False)
+    producto_id: Mapped[int] = mapped_column(ForeignKey("productos_maestro.id"), nullable=False)
+    cantidad: Mapped[int] = mapped_column(nullable=False)
+    precio_unitario_factura: Mapped[int] = mapped_column(nullable=False)
+    kilos_linea: Mapped[float] = mapped_column(nullable=False)
+    descuento_aplicado: Mapped[Optional[int]] = mapped_column(nullable=True, default=None)
+    subtotal_neto: Mapped[int] = mapped_column(nullable=False)
+    precio_tipo: Mapped[str] = mapped_column(nullable=False)  # "revendedor" | "publico"
+
+    venta: Mapped["VentaRevendedor"] = relationship(back_populates="lineas")
+    producto: Mapped["ProductoMaestro"] = relationship()
+
+
