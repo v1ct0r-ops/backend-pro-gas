@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from database import check_db_connection
+from app.core.config import settings
 
 
 router = APIRouter(tags=["Health"])
@@ -9,6 +10,7 @@ router = APIRouter(tags=["Health"])
 class HealthResponse(BaseModel):
     status: str
     db_connection: str
+    cors_origins: list[str]
 
 
 @router.get(
@@ -36,4 +38,4 @@ def health_check() -> HealthResponse:
             },
         )
 
-    return HealthResponse(status="ok", db_connection=db_status)
+    return HealthResponse(status="ok", db_connection=db_status, cors_origins=settings.cors_origins_list)
