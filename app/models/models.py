@@ -1,8 +1,10 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Text
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
+from sqlalchemy.sql import func
 
 
 class Base(DeclarativeBase):
@@ -151,4 +153,69 @@ class VentaRevendedorLinea(Base):
     venta: Mapped["VentaRevendedor"] = relationship(back_populates="lineas")
     producto: Mapped["ProductoMaestro"] = relationship()
 
+
+class MediaCargaHistorial(Base):
+    """Snapshot inmutable de cada ingreso de galones. Nunca se modifica tras su creación."""
+
+    __tablename__ = "medias_cargas_historial"
+    __table_args__ = (
+        # Índice compuesto para el reporte más frecuente: proveedor + rango de fecha
+        Index("ix_mc_hist_proveedor_fecha", "proveedor", "fecha_registro"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    # FK nullable con SET NULL: el historial sobrevive si se elimina la media carga origen
+    media_carga_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("medias_cargas.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
+    # --- Snapshot del documento (desnormalizado, inmutable) ---
+    numero_guia: Mapped[str] = mapped_column(nullable=False, index=True)
+    proveedor: Mapped[str] = mapped_column(nullable=False)
+    fecha_documento: Mapped[datetime] = mapped_column(DateTime(timezone=False), nullable=False)
+
+    # --- Montos en CLP: Integer elimina error de punto flotante (regla del proyecto) ---
+    total_neto: Mapped[int] = mapped_column(nullable=False)
+    total_iva: Mapped[int] = mapped_column(nullable=False)   # siempre round(neto * 0.19)
+    total_bruto: Mapped[int] = mapped_column(nullable=False)  # neto + iva
+
+    # --- Kilos con Numeric(10,3): exactitud decimal sin IEEE-754 ---
+    kilos_totales: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+
+    # --- Auditoría ---
+    # server_default=func.now() → la DB fija el timestamp atómicamente, sin depender del reloj de la app
+    fecha_registro: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    # RESTRICT: un usuario con historial no puede eliminarse (integridad de auditoría)
+    registrado_por_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+
+    registrado_por: Mapped["Usuario"] = relationship()
+    lineas: Mapped[list["MediaCargaHistorialLinea"]] = relationship(
+        back_populates="historial", cascade="all, delete-orphan"
+    )
+
+
+class MediaCargaHistorialLinea(Base):
+    """Línea de detalle del historial. Snapshot del producto al momento del ingreso."""
+
+    __tablename__ = "medias_cargas_historial_lineas"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    historial_id: Mapped[int] = mapped_column(
+        ForeignKey("medias_cargas_historial.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+
+    # Snapshot desnormalizado: refleja el estado del producto en el momento exacto del ingreso
+    formato_producto: Mapped[str] = mapped_column(nullable=False)         # ej. "11kg"
+    cantidad_llenos: Mapped[int] = mapped_column(nullable=False)
+    cantidad_vacios: Mapped[int] = mapped_column(nullable=False, default=0)
+    precio_unitario_neto: Mapped[int] = mapped_column(nullable=False)     # CLP, sin IVA
+    kilos_linea: Mapped[Decimal] = mapped_column(Numeric(10, 3), nullable=False)
+    subtotal_neto: Mapped[int] = mapped_column(nullable=False)            # cantidad_llenos * precio_unitario_neto
+
+    historial: Mapped["MediaCargaHistorial"] = relationship(back_populates="lineas")
 
