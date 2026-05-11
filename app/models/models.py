@@ -73,6 +73,7 @@ class MediaCarga(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     numero_guia: Mapped[str] = mapped_column(nullable=False)
+    proveedor: Mapped[Optional[str]] = mapped_column(nullable=True)  # nullable para filas previas a esta migración
     total_neto: Mapped[int] = mapped_column(nullable=False)
     total_iva: Mapped[int] = mapped_column(nullable=False)
     total_bruto: Mapped[int] = mapped_column(nullable=False)
