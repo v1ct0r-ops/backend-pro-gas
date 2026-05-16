@@ -33,5 +33,8 @@ class CierreDiarioOut(BaseModel):
     estado_cuadre: Optional[str]
     stock_snapshot: Optional[Any]
     usuario_id: int
+    created_at: Optional[datetime]
+    closed_at: Optional[datetime]
+    cerrado_por_id: Optional[int]
 
     model_config = ConfigDict(from_attributes=True)

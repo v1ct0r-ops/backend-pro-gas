@@ -115,7 +115,22 @@ class CierreDiario(Base):
     stock_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=None)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
 
-    usuario: Mapped["Usuario"] = relationship(back_populates="cierres_diarios")
+    # Auditoría — nullable=True para no romper filas existentes en la migración
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    closed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None
+    )
+    cerrado_por_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+
+    # foreign_keys requerido porque hay dos FK a la misma tabla usuarios
+    usuario: Mapped["Usuario"] = relationship(
+        back_populates="cierres_diarios", foreign_keys=[usuario_id]
+    )
+    cerrado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[cerrado_por_id])
 
 
 class VentaRevendedor(Base):
