@@ -23,7 +23,9 @@ class Usuario(Base):
 
     bitacora_llamadas: Mapped[list["BitacoraLlamada"]] = relationship(back_populates="usuario")
     medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario")
-    cierres_diarios: Mapped[list["CierreDiario"]] = relationship(back_populates="usuario")
+    cierres_diarios: Mapped[list["CierreDiario"]] = relationship(
+        back_populates="usuario", foreign_keys="[CierreDiario.usuario_id]"
+    )
     ventas_revendedor: Mapped[list["VentaRevendedor"]] = relationship(back_populates="usuario")
 
 
