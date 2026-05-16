@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class CierreDiarioCreate(BaseModel):
@@ -18,6 +18,28 @@ class CierreDiarioCreate(BaseModel):
         if v < 0:
             raise ValueError("Los montos no pueden ser negativos")
         return v
+
+
+class CierreDiarioUpdate(BaseModel):
+    chofer_nombre: Optional[str] = None
+    fecha: Optional[datetime] = None
+    efectivo_rendido: Optional[int] = None
+    vouchers_transbank: Optional[int] = None
+    descuentos: Optional[int] = None
+    total_ventas_calc: Optional[int] = None
+
+    @field_validator("efectivo_rendido", "vouchers_transbank", "descuentos", "total_ventas_calc", mode="before")
+    @classmethod
+    def no_negativo(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v < 0:
+            raise ValueError("Los montos no pueden ser negativos")
+        return v
+
+    @model_validator(mode="after")
+    def al_menos_un_campo(self) -> "CierreDiarioUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Debe enviar al menos un campo para actualizar")
+        return self
 
 
 class CierreDiarioOut(BaseModel):
