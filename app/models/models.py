@@ -115,6 +115,7 @@ class CierreDiario(Base):
     diferencia: Mapped[Optional[int]] = mapped_column(nullable=True, default=None)
     estado_cuadre: Mapped[Optional[str]] = mapped_column(nullable=True, default=None)
     stock_snapshot: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, default=None)
+    lineas_movimiento: Mapped[Optional[list]] = mapped_column(JSON, nullable=True, default=None)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
 
     # Auditoría — nullable=True para no romper filas existentes en la migración

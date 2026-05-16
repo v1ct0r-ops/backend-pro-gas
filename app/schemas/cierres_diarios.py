@@ -4,6 +4,19 @@ from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
+class LineaMovimientoCierre(BaseModel):
+    producto_id: int
+    galones_vendidos: int = 0
+    vacios_devueltos: int = 0
+
+    @field_validator("galones_vendidos", "vacios_devueltos")
+    @classmethod
+    def no_negativo(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Las cantidades no pueden ser negativas")
+        return v
+
+
 class CierreDiarioCreate(BaseModel):
     chofer_nombre: str
     fecha: datetime
@@ -11,6 +24,7 @@ class CierreDiarioCreate(BaseModel):
     vouchers_transbank: int = 0
     descuentos: int = 0
     total_ventas_calc: int = 0
+    lineas_movimiento: list[LineaMovimientoCierre] = []
 
     @field_validator("efectivo_rendido", "vouchers_transbank", "descuentos", "total_ventas_calc")
     @classmethod
@@ -54,6 +68,7 @@ class CierreDiarioOut(BaseModel):
     diferencia: Optional[int]
     estado_cuadre: Optional[str]
     stock_snapshot: Optional[Any]
+    lineas_movimiento: Optional[Any]
     usuario_id: int
     created_at: Optional[datetime]
     closed_at: Optional[datetime]
