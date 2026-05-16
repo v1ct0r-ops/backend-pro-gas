@@ -101,6 +101,7 @@ class VentaRevendedorOut(BaseModel):
     rut_cliente: str
     nombre_cliente: str
     fecha: datetime
+    created_at: Optional[datetime] = None
     total_neto: int
     descuento_pesos_por_kilo: int
     monto_descuento_total: int
@@ -112,3 +113,8 @@ class VentaRevendedorOut(BaseModel):
     lineas: list[VentaRevendedorLineaOut]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VentaRevendedorListOut(BaseModel):
+    items: list[VentaRevendedorOut]
+    total: int

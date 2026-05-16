@@ -150,6 +150,9 @@ class VentaRevendedor(Base):
     total_bruto: Mapped[int] = mapped_column(nullable=False)
     kilos_totales: Mapped[float] = mapped_column(nullable=False)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
 
     usuario: Mapped["Usuario"] = relationship(back_populates="ventas_revendedor")
     lineas: Mapped[list["VentaRevendedorLinea"]] = relationship(back_populates="venta", cascade="all, delete-orphan")

@@ -4,9 +4,14 @@ from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_role
 from app.models.models import CierreDiario, Usuario
-from app.schemas.cierres_diarios import CierreDiarioCreate, CierreDiarioOut, CierreDiarioUpdate
+from app.schemas.cierres_diarios import (
+    CierreDiarioCreate,
+    CierreDiarioOut,
+    CierreDiarioPaginado,
+    CierreDiarioUpdate,
+)
 from app.services.cierre_diario_service import (
     actualizar_cierre,
     cerrar_cierre,
@@ -19,6 +24,9 @@ from database import get_db
 
 router = APIRouter()
 
+# Endpoints que mutan estado financiero o son destructivos requieren super_admin
+_admin = require_role("super_admin")
+
 
 @router.post("/", response_model=CierreDiarioOut, status_code=201)
 def crear(
@@ -29,7 +37,7 @@ def crear(
     return crear_cierre(db, payload, current_user.id)
 
 
-@router.get("/", response_model=list[CierreDiarioOut])
+@router.get("/", response_model=CierreDiarioPaginado)
 def listar(
     fecha_desde: Optional[datetime] = Query(default=None),
     fecha_hasta: Optional[datetime] = Query(default=None),
@@ -49,7 +57,10 @@ def listar(
         q = q.filter(CierreDiario.chofer_nombre.ilike(f"%{chofer}%"))
     if is_closed is not None:
         q = q.filter(CierreDiario.is_closed == is_closed)
-    return q.order_by(CierreDiario.fecha.desc()).offset((page - 1) * limit).limit(limit).all()
+
+    total = q.count()
+    items = q.order_by(CierreDiario.fecha.desc()).offset((page - 1) * limit).limit(limit).all()
+    return {"items": items, "total": total}
 
 
 @router.get("/{id}/pdf")
@@ -87,7 +98,7 @@ def cerrar(
     id: int,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = _admin,
 ):
     cierre, datos_email = cerrar_cierre(db, id, current_user.id)
     background_tasks.add_task(tarea_email_cierre, datos_email)
@@ -99,7 +110,7 @@ def actualizar(
     id: int,
     payload: CierreDiarioUpdate,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = _admin,
 ):
     return actualizar_cierre(db, id, payload)
 
@@ -108,6 +119,6 @@ def actualizar(
 def eliminar(
     id: int,
     db: Session = Depends(get_db),
-    _: Usuario = Depends(get_current_user),
+    _: Usuario = _admin,
 ):
     eliminar_cierre(db, id)

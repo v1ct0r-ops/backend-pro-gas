@@ -60,3 +60,8 @@ class CierreDiarioOut(BaseModel):
     cerrado_por_id: Optional[int]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class CierreDiarioPaginado(BaseModel):
+    items: list[CierreDiarioOut]
+    total: int
