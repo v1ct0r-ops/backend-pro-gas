@@ -14,6 +14,11 @@ from app.models.models import CierreDiario, VentaRevendedor
 
 SANTIAGO = ZoneInfo("America/Santiago")
 
+_MESES_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
 logger = logging.getLogger(__name__)
 
 _ESTADO_EMOJI = {
@@ -236,9 +241,7 @@ def enviar_reporte_diario(db: Session, email_destino: str) -> None:
         return
 
     hoy = datetime.now(SANTIAGO).date()
-    fecha_str = hoy.strftime("%-d de %B de %Y") if hasattr(hoy, "strftime") else str(hoy)
-    # strftime con %-d no es portable en Windows; usar formato seguro
-    fecha_str = hoy.strftime("%d/%m/%Y")
+    fecha_str = f"{hoy.day} de {_MESES_ES[hoy.month - 1]} de {hoy.year}"
 
     # --- El Gancho: totales de ventas revendedor del día ---
     ventas_row = (
