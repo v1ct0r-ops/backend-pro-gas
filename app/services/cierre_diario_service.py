@@ -38,8 +38,9 @@ def cerrar_cierre(db: Session, cierre_id: int, usuario_id: int) -> Tuple[CierreD
         if cierre.is_closed:
             raise HTTPException(403, "Este cierre ya está cerrado y es inmutable")
 
+        descuentos_seguros = cierre.descuentos or 0
         total_rendido = cierre.efectivo_rendido + cierre.vouchers_transbank
-        diferencia = cierre.total_ventas_calc - total_rendido
+        diferencia = (cierre.total_ventas_calc - descuentos_seguros) - total_rendido
 
         if diferencia == 0:
             estado_cuadre = "exacto"
