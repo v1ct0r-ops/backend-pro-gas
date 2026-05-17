@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -12,7 +12,7 @@ def registrar_llamada(db: Session, payload: BitacoraCreate, usuario_id: int) -> 
         telefono=payload.telefono,
         direccion=payload.direccion,
         detalle_pedido=payload.detalle_pedido,
-        fecha_hora=datetime.utcnow(),
+        fecha_hora=datetime.now(timezone.utc),
         usuario_id=usuario_id,
     )
     db.add(entrada)
