@@ -1,7 +1,15 @@
+from decimal import Decimal
+
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models.models import MediaCarga, MediaCargaLinea, ProductoMaestro
+from app.models.models import (
+    MediaCarga,
+    MediaCargaHistorial,
+    MediaCargaHistorialLinea,
+    MediaCargaLinea,
+    ProductoMaestro,
+)
 from app.schemas.medias_cargas import MediaCargaIn
 
 
@@ -20,7 +28,6 @@ def procesar_media_carga(
             if not producto:
                 raise HTTPException(404, f"Producto {linea_in.producto_id} no encontrado")
 
-            # Capa 3 de clamping: validación explícita a nivel de servicio
             if linea_in.cantidad_llenos < 1:
                 raise HTTPException(400, f"cantidad_llenos debe ser >= 1 para formato {producto.formato}")
 
@@ -40,6 +47,7 @@ def procesar_media_carga(
 
         media_carga = MediaCarga(
             numero_guia=payload.numero_guia,
+            proveedor=payload.proveedor,
             fecha=payload.fecha,
             total_neto=total_neto,
             total_iva=total_iva,
@@ -48,6 +56,21 @@ def procesar_media_carga(
             usuario_id=usuario_id,
         )
         db.add(media_carga)
+        db.flush()
+
+        # Snapshot de auditoría — misma transacción ACID que la media carga
+        historial = MediaCargaHistorial(
+            media_carga_id=media_carga.id,
+            numero_guia=payload.numero_guia,
+            proveedor=payload.proveedor,
+            fecha_documento=payload.fecha,
+            total_neto=total_neto,
+            total_iva=total_iva,
+            total_bruto=total_bruto,
+            kilos_totales=Decimal(str(round(kilos_totales, 3))),
+            registrado_por_id=usuario_id,
+        )
+        db.add(historial)
         db.flush()
 
         for data in lineas_data:
@@ -59,6 +82,18 @@ def procesar_media_carga(
                 subtotal_neto=data["subtotal_neto"],
             )
             db.add(linea)
+
+            hist_linea = MediaCargaHistorialLinea(
+                historial_id=historial.id,
+                formato_producto=data["producto"].formato,
+                cantidad_llenos=data["cantidad_llenos"],
+                cantidad_vacios=0,
+                precio_unitario_neto=data["precio_unitario_neto"],
+                kilos_linea=Decimal(str(round(data["cantidad_llenos"] * data["producto"].peso_kg, 3))),
+                subtotal_neto=data["subtotal_neto"],
+            )
+            db.add(hist_linea)
+
             data["producto"].stock_llenos += data["cantidad_llenos"]
 
         db.commit()
@@ -69,7 +104,6 @@ def procesar_media_carga(
         db.rollback()
         raise
     except ValueError as e:
-        # Captura errores de @validates en el modelo (clamping capa 2)
         db.rollback()
         raise HTTPException(400, f"Violación de integridad de stock: {str(e)}")
     except Exception as e:

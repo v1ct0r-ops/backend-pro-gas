@@ -1,10 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from fastapi.responses import Response
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.dependencies import get_current_user
-from app.models.models import MediaCarga, Usuario
-from app.schemas.medias_cargas import MediaCargaIn, MediaCargaOut
+from app.models.models import MediaCarga, MediaCargaHistorial, Usuario
+from app.schemas.medias_cargas import (
+    MediaCargaHistorialOut,
+    MediaCargaIn,
+    MediaCargaOut,
+)
 from app.services.media_carga_service import procesar_media_carga
+from app.utils.pdf_historial import generar_pdf_historial
 from database import get_db
 
 router = APIRouter()
@@ -27,6 +33,63 @@ def listar_medias_cargas(
     return db.query(MediaCarga).order_by(MediaCarga.fecha.desc()).all()
 
 
+# IMPORTANTE: /historial debe ir ANTES de /{id} para que FastAPI no lo interprete como un ID
+@router.get("/historial", response_model=list[MediaCargaHistorialOut])
+def listar_historial(
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    registros = (
+        db.query(MediaCargaHistorial)
+        .options(joinedload(MediaCargaHistorial.lineas), joinedload(MediaCargaHistorial.registrado_por))
+        .order_by(MediaCargaHistorial.fecha_registro.desc())
+        .all()
+    )
+    return [_historial_to_out(r) for r in registros]
+
+
+@router.get("/historial/{historial_id}", response_model=MediaCargaHistorialOut)
+def obtener_historial(
+    historial_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    registro = (
+        db.query(MediaCargaHistorial)
+        .options(joinedload(MediaCargaHistorial.lineas), joinedload(MediaCargaHistorial.registrado_por))
+        .filter(MediaCargaHistorial.id == historial_id)
+        .first()
+    )
+    if not registro:
+        raise HTTPException(404, "Registro de historial no encontrado")
+    return _historial_to_out(registro)
+
+
+@router.get("/historial/{historial_id}/pdf")
+def exportar_historial_pdf(
+    historial_id: int,
+    db: Session = Depends(get_db),
+    _: Usuario = Depends(get_current_user),
+):
+    registro = (
+        db.query(MediaCargaHistorial)
+        .options(joinedload(MediaCargaHistorial.lineas), joinedload(MediaCargaHistorial.registrado_por))
+        .filter(MediaCargaHistorial.id == historial_id)
+        .first()
+    )
+    if not registro:
+        raise HTTPException(404, "Registro de historial no encontrado")
+
+    pdf_bytes = generar_pdf_historial(registro)
+    filename = f"media_carga_{registro.numero_guia}_{registro.id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{id}", response_model=MediaCargaOut)
 def obtener_media_carga(
     id: int,
@@ -37,3 +100,10 @@ def obtener_media_carga(
     if not mc:
         raise HTTPException(404, "Media carga no encontrada")
     return mc
+
+
+def _historial_to_out(h: MediaCargaHistorial) -> MediaCargaHistorialOut:
+    """Construye el schema de salida inyectando el nombre del usuario."""
+    data = MediaCargaHistorialOut.model_validate(h)
+    data.registrado_por_nombre = h.registrado_por.nombre if h.registrado_por else None
+    return data

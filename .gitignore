@@ -36,13 +36,21 @@ ENV/
 CLAUDE.md
 .claude/
 
-# Test & verification scripts (dev only)
-test_*.py
-verify_*.py
-certify_*.py
-stress_test_*.py
-setting_check.py
+# Test & verification scripts ad-hoc en la raíz (dev only)
+# El / ancla la regla a la raíz — no afecta tests/ ni subdirectorios
+/test_*.py
+/verify_*.py
+/certify_*.py
+/stress_test_*.py
+/setting_check.py
 *_plan.md
+
+# Cobertura — archivos generados, no pertenecen al historial
+.coverage
+htmlcov/
+
+# Memoria local de Claude Code — tooling interno, no para versionar
+memory/
 
 # Generated / tooling — no pertenecen al historial de git
 openapi.json

@@ -83,6 +83,29 @@ class VentaRevendedorIn(BaseModel):
         return v
 
 
+class VentaRevendedorPatch(BaseModel):
+    """Solo permite corregir campos de identificación. Los montos son inmutables post-registro."""
+    rut_cliente: Optional[str] = None
+    nombre_cliente: Optional[str] = None
+    fecha: Optional[datetime] = None
+
+    @field_validator("rut_cliente")
+    @classmethod
+    def validar_rut(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            return _validar_rut_chileno(v)
+        return v
+
+    @field_validator("nombre_cliente")
+    @classmethod
+    def nombre_no_vacio(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            if not v.strip():
+                raise ValueError("nombre_cliente no puede estar vacío")
+            return v.strip()
+        return v
+
+
 class VentaRevendedorLineaOut(BaseModel):
     id: int
     producto_id: int
@@ -101,6 +124,7 @@ class VentaRevendedorOut(BaseModel):
     rut_cliente: str
     nombre_cliente: str
     fecha: datetime
+    created_at: Optional[datetime] = None
     total_neto: int
     descuento_pesos_por_kilo: int
     monto_descuento_total: int
@@ -112,3 +136,8 @@ class VentaRevendedorOut(BaseModel):
     lineas: list[VentaRevendedorLineaOut]
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class VentaRevendedorListOut(BaseModel):
+    items: list[VentaRevendedorOut]
+    total: int
