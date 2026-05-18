@@ -1,9 +1,11 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqladmin import Admin, ModelView # Agregamos ModelView
 
 # Importamos la configuración y el engine
-from app.core.config import settings, engine 
+from app.core.config import settings, engine
 
 # Importamos los modelos y el router
 from app.api.v1.health import router as health_router
@@ -14,10 +16,20 @@ from app.api.v1.bitacora import router as bitacora_router
 from app.api.v1.usuarios import router as usuarios_router
 from app.api.v1.cierres_diarios import router as cierres_diarios_router
 from app.api.v1.ventas_revendedor import router as ventas_revendedor_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.reportes import router as reportes_router
 from app.models.models import (
     Base, Usuario, ProductoMaestro, BitacoraLlamada, MediaCarga, MediaCargaLinea,
     CierreDiario, VentaRevendedor, VentaRevendedorLinea,
 )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from app.core.scheduler import scheduler
+    scheduler.start()
+    yield
+    scheduler.shutdown()
+
 
 # 1. Definimos la APP UNA SOLA VEZ con toda la info
 app = FastAPI(
@@ -27,6 +39,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
+    lifespan=lifespan,
 )
 
 # 2. Creamos las tablas en la DB de Docker
@@ -129,6 +142,8 @@ app.include_router(bitacora_router, prefix="/api/v1/bitacora", tags=["bitacora"]
 app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["usuarios"])
 app.include_router(cierres_diarios_router, prefix="/api/v1/cierres-diarios", tags=["cierres-diarios"])
 app.include_router(ventas_revendedor_router, prefix="/api/v1/ventas-revendedor", tags=["ventas-revendedor"])
+app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(reportes_router, prefix="/api/v1/reportes", tags=["reportes"])
 
 # 6. Ruta Raíz (Consolidada)
 @app.get("/", include_in_schema=False)

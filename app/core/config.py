@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     SMTP_FROM: str = ""
     SUPER_ADMIN_EMAIL: str = ""
 
+    # Resend — API de correo transaccional para el Reporte Diario
+    RESEND_API_KEY: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Convierte el string de CORS_ORIGINS en una lista."""
