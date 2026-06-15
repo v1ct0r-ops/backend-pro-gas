@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LineaMovimientoCierre(BaseModel):
@@ -56,6 +56,10 @@ class CierreDiarioUpdate(BaseModel):
         return self
 
 
+class CierreDiarioAnular(BaseModel):
+    motivo_anulacion: str = Field(min_length=3, max_length=500)
+
+
 class CierreDiarioOut(BaseModel):
     id: int
     chofer_nombre: str
@@ -73,10 +77,11 @@ class CierreDiarioOut(BaseModel):
     created_at: Optional[datetime]
     closed_at: Optional[datetime]
     cerrado_por_id: Optional[int]
+    anulado: bool
+    anulado_at: Optional[datetime]
+    anulado_por_id: Optional[int]
+    motivo_anulacion: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class CierreDiarioPaginado(BaseModel):
-    items: list[CierreDiarioOut]
-    total: int

@@ -135,11 +135,20 @@ class CierreDiario(Base):
         ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
     )
 
-    # foreign_keys requerido porque hay dos FK a la misma tabla usuarios
+    # Anulación (soft delete, solo super_admin)
+    anulado: Mapped[bool] = mapped_column(nullable=False, default=False)
+    anulado_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    anulado_por_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+    motivo_anulacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+
+    # foreign_keys requerido porque hay tres FK a la misma tabla usuarios
     usuario: Mapped["Usuario"] = relationship(
         back_populates="cierres_diarios", foreign_keys=[usuario_id]
     )
     cerrado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[cerrado_por_id])
+    anulado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[anulado_por_id])
 
 
 class VentaRevendedor(Base):

@@ -5,15 +5,18 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, R
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_role
+from app.core.pagination import PaginationParams
 from app.models.models import CierreDiario, Usuario
 from app.schemas.cierres_diarios import (
+    CierreDiarioAnular,
     CierreDiarioCreate,
     CierreDiarioOut,
-    CierreDiarioPaginado,
     CierreDiarioUpdate,
 )
+from app.schemas.pagination import Page
 from app.services.cierre_diario_service import (
     actualizar_cierre,
+    anular_cierre,
     cerrar_cierre,
     crear_cierre,
     eliminar_cierre,
@@ -24,7 +27,6 @@ from database import get_db
 
 router = APIRouter()
 
-# Endpoints que mutan estado financiero o son destructivos requieren super_admin
 _admin = require_role("super_admin")
 
 
@@ -37,18 +39,20 @@ def crear(
     return crear_cierre(db, payload, current_user.id)
 
 
-@router.get("/", response_model=CierreDiarioPaginado)
+@router.get("/", response_model=Page[CierreDiarioOut])
 def listar(
     fecha_desde: Optional[datetime] = Query(default=None),
     fecha_hasta: Optional[datetime] = Query(default=None),
     chofer: Optional[str] = Query(default=None),
     is_closed: Optional[bool] = Query(default=None),
-    page: int = Query(default=1, ge=1),
-    limit: int = Query(default=50, ge=1, le=200),
+    incluir_anulados: bool = Query(default=False),
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
     q = db.query(CierreDiario)
+    if not incluir_anulados:
+        q = q.filter(CierreDiario.anulado == False)
     if fecha_desde:
         q = q.filter(CierreDiario.fecha >= fecha_desde)
     if fecha_hasta:
@@ -59,8 +63,13 @@ def listar(
         q = q.filter(CierreDiario.is_closed == is_closed)
 
     total = q.count()
-    items = q.order_by(CierreDiario.fecha.desc()).offset((page - 1) * limit).limit(limit).all()
-    return {"items": items, "total": total}
+    items = (
+        q.order_by(CierreDiario.fecha.desc(), CierreDiario.id.desc())
+        .offset((pagination.page - 1) * pagination.page_size)
+        .limit(pagination.page_size)
+        .all()
+    )
+    return {"items": items, "total": total, "page": pagination.page, "page_size": pagination.page_size}
 
 
 @router.get("/{id}/pdf")
@@ -103,6 +112,16 @@ def cerrar(
     cierre, datos_email = cerrar_cierre(db, id, current_user.id)
     background_tasks.add_task(tarea_email_cierre, datos_email)
     return cierre
+
+
+@router.patch("/{id}/anular", response_model=CierreDiarioOut)
+def anular(
+    id: int,
+    payload: CierreDiarioAnular,
+    db: Session = Depends(get_db),
+    current_user: Usuario = _admin,
+):
+    return anular_cierre(db, id, current_user.id, payload.motivo_anulacion)
 
 
 @router.patch("/{id}", response_model=CierreDiarioOut)
