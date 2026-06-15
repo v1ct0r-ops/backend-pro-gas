@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from typing import Tuple
 
 from fastapi import HTTPException
+from sqlalchemy import tuple_
 from sqlalchemy.orm import Session
 
 from app.models.models import CierreDiario, ProductoMaestro
@@ -146,6 +147,70 @@ def eliminar_cierre(db: Session, cierre_id: int) -> None:
     except Exception as e:
         db.rollback()
         raise HTTPException(500, f"Error al eliminar cierre: {e}")
+
+
+def anular_cierre(db: Session, cierre_id: int, usuario_id: int, motivo: str) -> CierreDiario:
+    try:
+        cierre = db.get(CierreDiario, cierre_id, with_for_update=True)
+        if not cierre:
+            raise HTTPException(404, "Cierre no encontrado")
+        if not cierre.is_closed:
+            raise HTTPException(400, "Solo se pueden anular cierres sellados")
+        if cierre.anulado:
+            raise HTTPException(409, "El cierre ya está anulado")
+
+        # ── Correlatividad: solo se puede anular el último cierre sellado activo ──
+        existe_posterior = (
+            db.query(CierreDiario)
+            .filter(
+                CierreDiario.is_closed == True,
+                CierreDiario.anulado == False,
+                CierreDiario.id != cierre_id,
+                tuple_(CierreDiario.fecha, CierreDiario.id) > tuple_(cierre.fecha, cierre.id),
+            )
+            .first()
+        )
+        if existe_posterior:
+            raise HTTPException(409, "Solo se puede anular el último cierre sellado activo")
+
+        # ── Reversión de inventario: validar primero, luego aplicar ──────────────
+        if cierre.lineas_movimiento:
+            productos_cache: dict[int, ProductoMaestro] = {}
+            for linea in cierre.lineas_movimiento:
+                producto_id = linea["producto_id"]
+                producto = db.get(ProductoMaestro, producto_id, with_for_update=True)
+                if not producto:
+                    raise HTTPException(404, f"Producto ID {producto_id} no encontrado en inventario maestro")
+                productos_cache[producto_id] = producto
+
+                vacios_devueltos = linea.get("vacios_devueltos", 0)
+                if producto.stock_vacios - vacios_devueltos < 0:
+                    raise HTTPException(
+                        400,
+                        f"Reversión imposible: stock de vacíos insuficiente para {producto.formato}",
+                    )
+
+            for linea in cierre.lineas_movimiento:
+                producto = productos_cache[linea["producto_id"]]
+                producto.stock_llenos += linea.get("galones_vendidos", 0)
+                producto.stock_vacios -= linea.get("vacios_devueltos", 0)
+
+        # ── Marcar como anulado (sin reabrir is_closed) ───────────────────────────
+        cierre.anulado = True
+        cierre.anulado_at = datetime.now(timezone.utc)
+        cierre.anulado_por_id = usuario_id
+        cierre.motivo_anulacion = motivo
+
+        db.commit()
+        db.refresh(cierre)
+        return cierre
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Error al anular cierre: {str(e)}")
 
 
 def _datos_email(cierre: CierreDiario) -> dict:

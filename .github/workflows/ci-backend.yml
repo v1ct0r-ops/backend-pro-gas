@@ -8,8 +8,23 @@ on:
 
 jobs:
   verificar-codigo:
-    name: Verificar sintaxis y dependencias
+    name: Verificar sintaxis, dependencias y tests
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: pro_gas_erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - name: Descargar el código
@@ -36,6 +51,13 @@ jobs:
           python -c "from app.core.config import settings"
           python -c "from app.core.security import hash_password, verify_password"
           python -c "from app.core.dependencies import get_current_user"
+
+      - name: Ejecutar tests
+        env:
+          DATABASE_URL: "postgresql+psycopg2://ci:ci_password@localhost:5432/pro_gas_erp"
+          TEST_DATABASE_URL: "postgresql+psycopg2://ci:ci_password@localhost:5432/pro_gas_test"
+          SECRET_KEY: "clave-dummy-solo-para-ci-no-usar-en-produccion"
+        run: pytest -q
 
       - name: Verificar que no hay archivos .env comprometidos
         run: |
