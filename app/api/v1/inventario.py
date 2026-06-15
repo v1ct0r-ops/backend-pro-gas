@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_role
 from app.models.models import ProductoMaestro, Usuario
-from app.schemas.inventario import AjusteStockIn, ProductoOut
+from app.schemas.inventario import AjusteStockIn, PrecioPublicoIn, ProductoOut
 from database import get_db
 
 router = APIRouter()
@@ -44,4 +44,26 @@ def ajustar_stock(
     except ValueError as e:
         db.rollback()
         raise HTTPException(400, f"Violación de integridad de stock: {str(e)}")
+    return producto
+
+
+@router.patch("/{id}/precio", response_model=ProductoOut)
+def actualizar_precio(
+    id: int,
+    payload: PrecioPublicoIn,
+    db: Session = Depends(get_db),
+    current_user: Usuario = require_role("super_admin"),
+):
+    producto = db.get(ProductoMaestro, id)
+    if not producto:
+        raise HTTPException(404, "Producto no encontrado")
+    if payload.precio_publico_base < 0:
+        raise HTTPException(400, "El precio_publico_base no puede ser negativo")
+    try:
+        producto.precio_publico_base = payload.precio_publico_base
+        db.commit()
+        db.refresh(producto)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(400, f"Error al actualizar precio: {str(e)}")
     return producto

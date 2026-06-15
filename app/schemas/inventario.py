@@ -24,3 +24,7 @@ class ProductoUpdate(BaseModel):
     stock_llenos: Optional[int] = None
     stock_vacios: Optional[int] = None
     precio_publico_base: Optional[int] = None
+
+
+class PrecioPublicoIn(BaseModel):
+    precio_publico_base: int
