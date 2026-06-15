@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text
+from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import func
 
@@ -22,7 +22,7 @@ class Usuario(Base):
     estado: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     bitacora_llamadas: Mapped[list["BitacoraLlamada"]] = relationship(back_populates="usuario")
-    medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario")
+    medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario", foreign_keys="[MediaCarga.usuario_id]")
     cierres_diarios: Mapped[list["CierreDiario"]] = relationship(
         back_populates="usuario", foreign_keys="[CierreDiario.usuario_id]"
     )
@@ -82,8 +82,14 @@ class MediaCarga(Base):
     kilos_totales: Mapped[float] = mapped_column(nullable=False)
     fecha: Mapped[datetime] = mapped_column(nullable=False)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    anulada: Mapped[bool] = mapped_column(nullable=False, default=False)
+    anulada_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    anulado_por_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
 
-    usuario: Mapped["Usuario"] = relationship(back_populates="medias_cargas")
+    usuario: Mapped["Usuario"] = relationship(back_populates="medias_cargas", foreign_keys=[usuario_id])
+    anulado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[anulado_por_id])
     lineas: Mapped[list["MediaCargaLinea"]] = relationship(back_populates="media_carga", cascade="all, delete-orphan")
 
 
@@ -129,11 +135,20 @@ class CierreDiario(Base):
         ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
     )
 
-    # foreign_keys requerido porque hay dos FK a la misma tabla usuarios
+    # Anulación (soft delete, solo super_admin)
+    anulado: Mapped[bool] = mapped_column(nullable=False, default=False)
+    anulado_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    anulado_por_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
+    motivo_anulacion: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default=None)
+
+    # foreign_keys requerido porque hay tres FK a la misma tabla usuarios
     usuario: Mapped["Usuario"] = relationship(
         back_populates="cierres_diarios", foreign_keys=[usuario_id]
     )
     cerrado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[cerrado_por_id])
+    anulado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[anulado_por_id])
 
 
 class VentaRevendedor(Base):
@@ -216,6 +231,7 @@ class MediaCargaHistorial(Base):
     )
 
     registrado_por: Mapped["Usuario"] = relationship()
+    media_carga: Mapped[Optional["MediaCarga"]] = relationship(foreign_keys=[media_carga_id])
     lineas: Mapped[list["MediaCargaHistorialLinea"]] = relationship(
         back_populates="historial", cascade="all, delete-orphan"
     )
@@ -241,3 +257,34 @@ class MediaCargaHistorialLinea(Base):
 
     historial: Mapped["MediaCargaHistorial"] = relationship(back_populates="lineas")
 
+
+class Cliente(Base):
+    """Maestro de clientes revendedor. Snapshot: la venta copia los valores al registrarse."""
+
+    __tablename__ = "clientes"
+    __table_args__ = (
+        CheckConstraint("descuento_pesos_por_kilo >= 0", name="ck_cliente_descuento_non_negative"),
+        Index("ix_clientes_nombre", "nombre"),
+        Index("ix_clientes_estado", "estado"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rut: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    nombre: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    telefono: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    direccion: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    descuento_pesos_por_kilo: Mapped[int] = mapped_column(nullable=False, default=0)
+    estado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, onupdate=func.now()
+    )
+
+    @validates("descuento_pesos_por_kilo")
+    def validate_descuento(self, key: str, value: int) -> int:
+        if value < 0:
+            raise ValueError(f"descuento_pesos_por_kilo no puede ser negativo (recibido: {value})")
+        return value

@@ -65,6 +65,7 @@ class MediaCargaOut(BaseModel):
     total_bruto: int
     kilos_totales: float
     usuario_id: int
+    anulada: bool
     lineas: list[MediaCargaLineaOut]
 
     model_config = ConfigDict(from_attributes=True)
@@ -97,6 +98,7 @@ class MediaCargaHistorialOut(BaseModel):
     fecha_registro: datetime
     registrado_por_id: int
     registrado_por_nombre: Optional[str] = None
+    anulada: bool = False
     lineas: list[MediaCargaHistorialLineaOut]
 
     model_config = ConfigDict(from_attributes=True)

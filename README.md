@@ -92,6 +92,8 @@ python -m venv .venv
 
 # Windows
 .venv\Scripts\activate
+# en caso de ocupar por bash para levantar
+source .venv/Scripts/activate
 
 # macOS / Linux
 source .venv/bin/activate

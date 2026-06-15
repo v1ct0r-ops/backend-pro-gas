@@ -21,7 +21,7 @@ class TestCajaHoy:
         from app.services.dashboard_service import _caja_hoy
 
         db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = None
+        db.query.return_value.filter.return_value.all.return_value = []
 
         resultado = _caja_hoy(db, es_admin=True)
 
@@ -38,7 +38,7 @@ class TestCajaHoy:
         row.efectivo_rendido = 50_000
 
         db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = row
+        db.query.return_value.filter.return_value.all.return_value = [row]
 
         resultado = _caja_hoy(db, es_admin=True)
 
@@ -59,7 +59,7 @@ class TestCajaHoy:
         row.efectivo_rendido = 50_000
 
         db = MagicMock()
-        db.query.return_value.filter.return_value.order_by.return_value.first.return_value = row
+        db.query.return_value.filter.return_value.all.return_value = [row]
 
         resultado = _caja_hoy(db, es_admin=False)
 
@@ -74,31 +74,36 @@ class TestCajaHoy:
 
 class TestVentasMes:
 
-    def test_sin_ventas_total_es_none_para_admin(self):
-        """Si no hay ventas en el mes, total_clp debe ser None (row.total_clp = None)."""
+    def test_sin_ventas_total_es_cero_para_admin(self):
+        """Sin ventas revendedor ni cierres en el mes, total_clp agregado es 0 (coalesce)."""
         from app.services.dashboard_service import _ventas_mes
 
-        row = MagicMock()
-        row.total_clp = None
-        row.kilos = 0.0
+        row_rev = MagicMock()
+        row_rev.total_clp = None
+        row_rev.kilos = 0.0
+        row_cierre = MagicMock()
+        row_cierre.total_clp = 0
 
         db = MagicMock()
-        db.query.return_value.filter.return_value.one.return_value = row
+        db.query.return_value.filter.return_value.one.side_effect = [row_rev, row_cierre]
 
         resultado = _ventas_mes(db, es_admin=True)
 
-        assert resultado["total_clp"] is None
+        assert resultado["total_clp"] == 0
         assert resultado["kilos_totales"] == 0.0
 
-    def test_con_ventas_admin_retorna_totales(self):
+    def test_con_ventas_admin_suma_revendedor_y_cierres(self):
+        """total_clp agrega ventas revendedor + ventas por cierres sellados del mes."""
         from app.services.dashboard_service import _ventas_mes
 
-        row = MagicMock()
-        row.total_clp = 150_000
-        row.kilos = 88.5
+        row_rev = MagicMock()
+        row_rev.total_clp = 100_000
+        row_rev.kilos = 88.5
+        row_cierre = MagicMock()
+        row_cierre.total_clp = 50_000
 
         db = MagicMock()
-        db.query.return_value.filter.return_value.one.return_value = row
+        db.query.return_value.filter.return_value.one.side_effect = [row_rev, row_cierre]
 
         resultado = _ventas_mes(db, es_admin=True)
 
