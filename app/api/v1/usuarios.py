@@ -2,8 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import require_role
+from app.core.pagination import PaginationParams
 from app.core.security import hash_password
 from app.models.models import Usuario
+from app.schemas.pagination import Page
 from app.schemas.usuarios import UsuarioCreate, UsuarioOut, UsuarioUpdate
 from database import get_db
 
@@ -12,12 +14,21 @@ router = APIRouter()
 _admin = require_role("super_admin")
 
 
-@router.get("/", response_model=list[UsuarioOut])
+@router.get("/", response_model=Page[UsuarioOut])
 def listar_usuarios(
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: Usuario = _admin,
 ):
-    return db.query(Usuario).all()
+    q = db.query(Usuario)
+    total = q.count()
+    items = (
+        q.order_by(Usuario.id.desc())
+        .offset((pagination.page - 1) * pagination.page_size)
+        .limit(pagination.page_size)
+        .all()
+    )
+    return {"items": items, "total": total, "page": pagination.page, "page_size": pagination.page_size}
 
 
 @router.get("/{id}", response_model=UsuarioOut)

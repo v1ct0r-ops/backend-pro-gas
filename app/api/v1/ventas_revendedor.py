@@ -5,10 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, require_role
+from app.core.pagination import PaginationParams
 from app.models.models import ProductoMaestro, Usuario, VentaRevendedor
+from app.schemas.pagination import Page
 from app.schemas.ventas_revendedor import (
     VentaRevendedorIn,
-    VentaRevendedorListOut,
     VentaRevendedorOut,
     VentaRevendedorPatch,
 )
@@ -28,13 +29,12 @@ def crear_venta_revendedor(
     return registrar_venta_revendedor(db, payload, current_user.id)
 
 
-@router.get("/", response_model=VentaRevendedorListOut)
+@router.get("/", response_model=Page[VentaRevendedorOut])
 def listar_ventas_revendedor(
     fecha_desde: Optional[datetime] = Query(None, description="Filtrar ventas desde esta fecha (ISO 8601)"),
     fecha_hasta: Optional[datetime] = Query(None, description="Filtrar ventas hasta esta fecha (ISO 8601)"),
     rut_cliente: Optional[str] = Query(None, description="Búsqueda parcial por RUT del cliente"),
-    page: int = Query(1, ge=1, description="Número de página"),
-    limit: int = Query(20, ge=1, le=100, description="Registros por página"),
+    pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
     _: Usuario = Depends(get_current_user),
 ):
@@ -49,13 +49,12 @@ def listar_ventas_revendedor(
 
     total = q.count()
     items = (
-        q.order_by(VentaRevendedor.fecha.desc())
-        .offset((page - 1) * limit)
-        .limit(limit)
+        q.order_by(VentaRevendedor.fecha.desc(), VentaRevendedor.id.desc())
+        .offset((pagination.page - 1) * pagination.page_size)
+        .limit(pagination.page_size)
         .all()
     )
-
-    return {"items": items, "total": total}
+    return {"items": items, "total": total, "page": pagination.page, "page_size": pagination.page_size}
 
 
 @router.get("/{id}/pdf")
@@ -125,13 +124,12 @@ def eliminar_venta_revendedor(
         raise HTTPException(404, "Venta no encontrada")
 
     try:
-        # Reponer stock antes de borrar el registro
         for linea in venta.lineas:
             producto = db.get(ProductoMaestro, linea.producto_id)
             if producto:
                 producto.stock_llenos += linea.cantidad
 
-        db.delete(venta)  # cascade elimina las lineas automáticamente
+        db.delete(venta)
         db.commit()
     except Exception as e:
         db.rollback()
