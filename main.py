@@ -16,10 +16,11 @@ from app.api.v1.bitacora import router as bitacora_router
 from app.api.v1.usuarios import router as usuarios_router
 from app.api.v1.cierres_diarios import router as cierres_diarios_router
 from app.api.v1.ventas_revendedor import router as ventas_revendedor_router
+from app.api.v1.clientes import router as clientes_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.reportes import router as reportes_router
 from app.models.models import (
-    Base, Usuario, ProductoMaestro, BitacoraLlamada, MediaCarga, MediaCargaLinea,
+    Base, Cliente, Usuario, ProductoMaestro, BitacoraLlamada, MediaCarga, MediaCargaLinea,
     CierreDiario, VentaRevendedor, VentaRevendedorLinea,
 )
 
@@ -124,6 +125,16 @@ class VentaRevendedorLineaAdmin(ModelView, model=VentaRevendedorLinea):
 
 admin.add_view(VentaRevendedorLineaAdmin)
 
+class ClienteAdmin(ModelView, model=Cliente):
+    name = "Cliente"
+    icon = "fa-solid fa-address-book"
+    column_list = [Cliente.id, Cliente.rut, Cliente.nombre, Cliente.email,
+                   Cliente.descuento_pesos_por_kilo, Cliente.estado]
+    column_searchable_list = [Cliente.rut, Cliente.nombre]
+    column_filters = [Cliente.estado]
+
+admin.add_view(ClienteAdmin)
+
 # 4. Middleware (CORS)
 app.add_middleware(
     CORSMiddleware,
@@ -142,6 +153,7 @@ app.include_router(bitacora_router, prefix="/api/v1/bitacora", tags=["bitacora"]
 app.include_router(usuarios_router, prefix="/api/v1/usuarios", tags=["usuarios"])
 app.include_router(cierres_diarios_router, prefix="/api/v1/cierres-diarios", tags=["cierres-diarios"])
 app.include_router(ventas_revendedor_router, prefix="/api/v1/ventas-revendedor", tags=["ventas-revendedor"])
+app.include_router(clientes_router, prefix="/api/v1/clientes", tags=["clientes"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(reportes_router, prefix="/api/v1/reportes", tags=["reportes"])
 

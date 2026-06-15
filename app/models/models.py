@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, Numeric, Text
+from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Index, Numeric, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import func
 
@@ -241,3 +241,34 @@ class MediaCargaHistorialLinea(Base):
 
     historial: Mapped["MediaCargaHistorial"] = relationship(back_populates="lineas")
 
+
+class Cliente(Base):
+    """Maestro de clientes revendedor. Snapshot: la venta copia los valores al registrarse."""
+
+    __tablename__ = "clientes"
+    __table_args__ = (
+        CheckConstraint("descuento_pesos_por_kilo >= 0", name="ck_cliente_descuento_non_negative"),
+        Index("ix_clientes_nombre", "nombre"),
+        Index("ix_clientes_estado", "estado"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rut: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
+    nombre: Mapped[str] = mapped_column(String, nullable=False)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    telefono: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    direccion: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    descuento_pesos_por_kilo: Mapped[int] = mapped_column(nullable=False, default=0)
+    estado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None, onupdate=func.now()
+    )
+
+    @validates("descuento_pesos_por_kilo")
+    def validate_descuento(self, key: str, value: int) -> int:
+        if value < 0:
+            raise ValueError(f"descuento_pesos_por_kilo no puede ser negativo (recibido: {value})")
+        return value
