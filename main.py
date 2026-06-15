@@ -2,9 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqladmin import Admin, ModelView # Agregamos ModelView
+from sqladmin import Admin, ModelView
 
-# Importamos la configuración y el engine
+from app.core.admin_auth import AdminAuth
 from app.core.config import settings, engine
 
 # Importamos los modelos y el router
@@ -47,8 +47,8 @@ app = FastAPI(
 # (Esto es lo que hace que aparezcan en pgAdmin o SQLAdmin)
 Base.metadata.create_all(bind=engine)
 
-# 3. Configuración del "Prisma Studio" (SQLAdmin)
-admin = Admin(app, engine)
+# 3. Configuración del "Prisma Studio" (SQLAdmin) — con autenticación
+admin = Admin(app, engine, authentication_backend=AdminAuth(secret_key=settings.SECRET_KEY))
 
 class UsuarioAdmin(ModelView, model=Usuario):
     name = "Usuario"
@@ -99,6 +99,9 @@ admin.add_view(MediaCargaLineaAdmin)
 class CierreDiarioAdmin(ModelView, model=CierreDiario):
     name = "Cierre Diario"
     icon = "fa-solid fa-calendar-check"
+    can_create = False
+    can_edit = False
+    can_delete = False
     column_list = [CierreDiario.id, CierreDiario.chofer_nombre, CierreDiario.fecha,
                    CierreDiario.total_ventas_calc, CierreDiario.is_closed, CierreDiario.usuario]
     column_searchable_list = [CierreDiario.chofer_nombre]
