@@ -22,7 +22,7 @@ class Usuario(Base):
     estado: Mapped[bool] = mapped_column(nullable=False, default=True)
 
     bitacora_llamadas: Mapped[list["BitacoraLlamada"]] = relationship(back_populates="usuario")
-    medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario")
+    medias_cargas: Mapped[list["MediaCarga"]] = relationship(back_populates="usuario", foreign_keys="[MediaCarga.usuario_id]")
     cierres_diarios: Mapped[list["CierreDiario"]] = relationship(
         back_populates="usuario", foreign_keys="[CierreDiario.usuario_id]"
     )
@@ -82,8 +82,14 @@ class MediaCarga(Base):
     kilos_totales: Mapped[float] = mapped_column(nullable=False)
     fecha: Mapped[datetime] = mapped_column(nullable=False)
     usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"), nullable=False)
+    anulada: Mapped[bool] = mapped_column(nullable=False, default=False)
+    anulada_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
+    anulado_por_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="RESTRICT"), nullable=True, default=None
+    )
 
-    usuario: Mapped["Usuario"] = relationship(back_populates="medias_cargas")
+    usuario: Mapped["Usuario"] = relationship(back_populates="medias_cargas", foreign_keys=[usuario_id])
+    anulado_por: Mapped[Optional["Usuario"]] = relationship(foreign_keys=[anulado_por_id])
     lineas: Mapped[list["MediaCargaLinea"]] = relationship(back_populates="media_carga", cascade="all, delete-orphan")
 
 
@@ -216,6 +222,7 @@ class MediaCargaHistorial(Base):
     )
 
     registrado_por: Mapped["Usuario"] = relationship()
+    media_carga: Mapped[Optional["MediaCarga"]] = relationship(foreign_keys=[media_carga_id])
     lineas: Mapped[list["MediaCargaHistorialLinea"]] = relationship(
         back_populates="historial", cascade="all, delete-orphan"
     )

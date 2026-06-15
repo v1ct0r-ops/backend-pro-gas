@@ -68,6 +68,14 @@ _total_bruto_valor = ParagraphStyle(
     textColor=AZUL_PROGAS,
     fontName="Helvetica-Bold",
 )
+_banner_anulada = ParagraphStyle(
+    "banner_anulada",
+    parent=_styles["Normal"],
+    fontSize=14,
+    textColor=colors.white,
+    alignment=TA_CENTER,
+    fontName="Helvetica-Bold",
+)
 
 
 def _fmt_clp(monto: int) -> str:
@@ -75,7 +83,14 @@ def _fmt_clp(monto: int) -> str:
 
 
 def _fmt_kilos(kilos: float) -> str:
-    return f"{float(kilos):.3f} kg"
+    valor = round(float(kilos), 2)
+    if valor == int(valor):
+        parte_entera = f"{int(valor):,}".replace(",", ".")
+        return f"{parte_entera} kg"
+    decimal_str = f"{valor:.2f}".rstrip("0")
+    int_part, dec_part = decimal_str.split(".")
+    int_formatted = f"{int(int_part):,}".replace(",", ".")
+    return f"{int_formatted},{dec_part} kg"
 
 
 def generar_pdf_historial(historial) -> bytes:
@@ -97,6 +112,20 @@ def generar_pdf_historial(historial) -> bytes:
     story.append(Paragraph("Pro-Gas ERP", _titulo))
     story.append(Paragraph("Historial de Ingreso de Galones — Media Carga", _subtitulo))
     story.append(HRFlowable(width="100%", thickness=1, color=AZUL_PROGAS, spaceAfter=12))
+
+    if getattr(historial, "media_carga", None) and historial.media_carga.anulada:
+        banner_table = Table(
+            [[Paragraph("DOCUMENTO ANULADO", _banner_anulada)]],
+            colWidths=[17 * cm],
+        )
+        banner_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.red),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ]))
+        story.append(banner_table)
+        story.append(Spacer(1, 0.3 * cm))
 
     # --- Datos del documento ---
     fecha_doc = historial.fecha_documento
