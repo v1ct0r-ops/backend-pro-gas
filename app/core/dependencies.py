@@ -14,7 +14,14 @@ async def get_current_user(
     db: Session = Depends(get_db),
 ) -> Usuario:
     payload = decode_access_token(token)
-    user = db.get(Usuario, int(payload["sub"]))
+    # HR-02: un JWT firmado pero sin 'sub' (o con 'sub' no numérico) debe
+    # responder 401, no provocar KeyError/ValueError -> 500 con stack trace.
+    sub = payload.get("sub")
+    try:
+        user_id = int(sub)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+    user = db.get(Usuario, user_id)
     if not user or not user.estado:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario inactivo o no encontrado")
     return user
