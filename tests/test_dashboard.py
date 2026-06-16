@@ -67,6 +67,53 @@ class TestCajaHoy:
         assert resultado["total_ventas_calc"] is None
         assert resultado["efectivo_rendido"] is None
 
+    def test_todos_cerrados_con_faltante_retorna_estado_faltante(self):
+        """Múltiples cierres todos cerrados: si hay faltante → 'faltante'."""
+        from app.services.dashboard_service import _caja_hoy
+
+        row1 = MagicMock()
+        row1.is_closed = True
+        row1.estado_cuadre = "exacto"
+        row1.total_ventas_calc = 10_000
+        row1.efectivo_rendido = 10_000
+
+        row2 = MagicMock()
+        row2.is_closed = True
+        row2.estado_cuadre = "faltante"
+        row2.total_ventas_calc = 8_000
+        row2.efectivo_rendido = 7_000
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.all.return_value = [row1, row2]
+
+        resultado = _caja_hoy(db, es_admin=True)
+
+        assert resultado["estado_cuadre"] == "faltante"
+        assert resultado["is_closed"] is True
+
+    def test_todos_cerrados_sin_faltante_con_sobrante_retorna_sobrante(self):
+        """Múltiples cierres todos cerrados, ninguno faltante pero sí sobrante → 'sobrante'."""
+        from app.services.dashboard_service import _caja_hoy
+
+        row1 = MagicMock()
+        row1.is_closed = True
+        row1.estado_cuadre = "exacto"
+        row1.total_ventas_calc = 10_000
+        row1.efectivo_rendido = 10_000
+
+        row2 = MagicMock()
+        row2.is_closed = True
+        row2.estado_cuadre = "sobrante"
+        row2.total_ventas_calc = 8_000
+        row2.efectivo_rendido = 9_000
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.all.return_value = [row1, row2]
+
+        resultado = _caja_hoy(db, es_admin=True)
+
+        assert resultado["estado_cuadre"] == "sobrante"
+
 
 # ===========================================================================
 # TEST SUITE 2: _ventas_mes
@@ -248,3 +295,45 @@ class TestGetDashboardResumen:
         assert resultado["ventas_mes_actual"] == ventas
         assert resultado["salud_cuadres"] == salud
         assert resultado["grafico_7_dias"] == grafico
+
+
+# ===========================================================================
+# TEST SUITE 6: _kilos_cierres_por_dia
+# ===========================================================================
+
+class TestKilosCierresPorDia:
+
+    def test_acumula_kilos_y_salta_cierres_vacios_y_lineas_invalidas(self):
+        """Cubre las ramas internas del bucle de _kilos_cierres_por_dia:
+        - Cierre sin lineas_movimiento → continue
+        - Linea con producto desconocido → skip
+        - Linea con galones=0 → skip
+        - Linea válida → acumula kilos (galones × peso_kg)
+        """
+        from datetime import datetime
+        from app.services.dashboard_service import _kilos_cierres_por_dia
+
+        hoy = date.today()
+
+        prod = MagicMock()
+        prod.id = 1
+        prod.peso_kg = 11.0
+
+        c_vacio = MagicMock()
+        c_vacio.lineas_movimiento = []
+
+        c_con_lineas = MagicMock()
+        c_con_lineas.fecha = datetime(hoy.year, hoy.month, hoy.day, 10, 0, 0)
+        c_con_lineas.lineas_movimiento = [
+            {"producto_id": 1, "galones_vendidos": 5, "vacios_devueltos": 0},
+            {"producto_id": 99, "galones_vendidos": 3, "vacios_devueltos": 0},
+            {"producto_id": 1, "galones_vendidos": 0, "vacios_devueltos": 0},
+        ]
+
+        db = MagicMock()
+        db.query.return_value.all.return_value = [prod]
+        db.query.return_value.filter.return_value.all.return_value = [c_vacio, c_con_lineas]
+
+        resultado = _kilos_cierres_por_dia(db, hoy, hoy)
+
+        assert resultado == {hoy: 55.0}
