@@ -185,6 +185,41 @@ class TestAnularMediaCargaService:
 
         assert exc.value.status_code == 404
 
+    def test_value_error_en_commit_lanza_400(self):
+        """db.commit() lanza ValueError (violación check constraint) → HTTP 400 + rollback."""
+        from fastapi import HTTPException
+        from app.services.media_carga_service import anular_media_carga
+
+        lineas = [_make_linea(1, 5)]
+        mc = _make_media_carga(mc_id=10, lineas=lineas)
+        prod = _make_producto(1, "11kg", stock_llenos=10)
+        db = _make_db(mc, [prod])
+        db.commit.side_effect = ValueError("check constraint violado")
+
+        with pytest.raises(HTTPException) as exc:
+            anular_media_carga(db, 10, usuario_id=1)
+
+        assert exc.value.status_code == 400
+        assert "integridad" in exc.value.detail
+        db.rollback.assert_called_once()
+
+    def test_exception_generica_en_commit_lanza_500(self):
+        """db.commit() lanza excepción genérica → HTTP 500 + rollback."""
+        from fastapi import HTTPException
+        from app.services.media_carga_service import anular_media_carga
+
+        lineas = [_make_linea(1, 5)]
+        mc = _make_media_carga(mc_id=11, lineas=lineas)
+        prod = _make_producto(1, "11kg", stock_llenos=10)
+        db = _make_db(mc, [prod])
+        db.commit.side_effect = RuntimeError("timeout de BD")
+
+        with pytest.raises(HTTPException) as exc:
+            anular_media_carga(db, 11, usuario_id=1)
+
+        assert exc.value.status_code == 500
+        db.rollback.assert_called_once()
+
 
 # ===========================================================================
 # TEST SUITE — HTTP endpoint DELETE /medias-cargas/{id}

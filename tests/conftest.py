@@ -128,6 +128,7 @@ def setup_test_db():
     _ensure_test_db_exists(_test_db_name, _TEST_DB_URL)
 
     from app.models.models import Base
+    Base.metadata.drop_all(bind=db_module.engine)
     Base.metadata.create_all(bind=db_module.engine)
 
     yield
